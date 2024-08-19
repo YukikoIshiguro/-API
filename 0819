@@ -1,0 +1,65 @@
+import requests
+import pandas as pd
+import os
+
+# APIキーをここに記入
+API_KEY = '634c407235d16f2b'
+
+# リクエストURL
+URL = 'http://webservice.recruit.co.jp/hotpepper/gourmet/v1/'
+
+# 検索条件を設定する
+params = {
+    'key': API_KEY,
+    'keyword': '恵比寿駅',  # 検索キーワード
+    'format': 'json',  # データ形式をJSONに指定
+    'count': 15  # 取得するデータ件数
+}
+
+# APIリクエストを送信
+response = requests.get(URL, params=params)
+
+# レスポンスをJSON形式で取得
+datum = response.json()
+
+# APIから取得したデータの結果件数をターミナルに表示
+results_available = datum.get('results', {}).get('results_available', 0)
+print(f"取得件数: {results_available}件")
+
+# お店のデータをリストに格納
+results = []
+if 'results' in datum and 'shop' in datum['results']:
+    stores = datum['results']['shop']
+    for store in stores:
+        results.append({
+            '店舗名': store.get('name', 'N/A'),
+            '電話番号': store.get('tel', 'N/A'),
+            'サービスエリア名': store.get('service_area', {}).get('name', 'N/A'),
+            '住所': store.get('address', 'N/A'),
+            '口コミ': store.get('catch', 'N/A'),
+            '営業時間': store.get('open', 'N/A'),
+            '定休日': store.get('close', 'N/A'),
+            'ディナー予算': store.get('budget', {}).get('average', 'N/A'),
+            'スマートフォン向けURL': store.get('urls', {}).get('sp', 'N/A'),
+            'PC向けURL': store.get('urls', {}).get('pc', 'N/A'),
+            '大サービスエリア名': store.get('large_service_area', {}).get('name', 'N/A')
+        })
+else:
+    print("検索に失敗しました。")
+
+# データをExcelに保存
+try:
+    if results:
+        df = pd.DataFrame(results)
+
+        # 出力ファイルパスをユーザーのドキュメントフォルダに設定
+        output_directory = os.path.join(os.path.expanduser('~'), 'Documents')
+        output_file_path = os.path.join(output_directory, 'store_data.xlsx')
+
+        # データフレームをExcelファイルに書き出す
+        df.to_excel(output_file_path, index=False, engine='openpyxl')
+
+        print(f"Excelファイル '{output_file_path}' に保存されました！")
+
+except Exception as e:
+    print(f"エラーが発生しました: {e}")
