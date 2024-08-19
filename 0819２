@@ -1,0 +1,110 @@
+import requests
+import pandas as pd
+import os
+
+# APIキーをここに記入
+API_KEY = '634c407235d16f2b'
+
+# リクエストURL
+URL = 'http://webservice.recruit.co.jp/hotpepper/gourmet/v1/'
+
+# 検索条件を設定する関数
+def get_data(keywords, count=None):
+    # 複数のキーワードをスペースで区切って結合
+    keyword_str = ' '.join(keywords)
+    
+    # 検索条件を設定
+    params = {
+        'key': API_KEY,
+        'keyword': keyword_str,
+        'format': 'json',
+        'count': count if count else 100,  # 指定された件数か最大100件を取得
+        'start': 1
+    }
+    
+    results = []
+    print(f"検索キーワード: {keyword_str}")
+    while True:
+        print(f"リクエスト送信中... (開始位置: {params['start']})")
+        # APIリクエストを送信
+        response = requests.get(URL, params=params)
+        datum = response.json()
+
+        if response.status_code != 200:
+            print(f"HTTPエラー: {response.status_code}")
+            break
+        
+        # データが取得できない場合は終了
+        if 'results' not in datum or 'shop' not in datum['results']:
+            print("検索に失敗しました。")
+            break
+        
+        print(f"取得したデータ件数: {len(datum['results']['shop'])}件")
+        # 取得したデータをリストに追加
+        stores = datum['results']['shop']
+        results.extend([{
+            '店舗名': store.get('name', 'N/A'),
+            '電話番号': store.get('tel', 'N/A') if 'tel' in store else '電話番号なし',
+            'サービスエリア名': store.get('service_area', {}).get('name', 'N/A'),
+            '住所': store.get('address', 'N/A'),
+            '口コミ': store.get('catch', 'N/A'),
+            '営業時間': store.get('open', 'N/A'),
+            '定休日': store.get('close', 'N/A'),
+            'ディナー予算': store.get('budget', {}).get('average', 'N/A'),
+            '予算テキスト': store.get('budget', {}).get('name', 'N/A'),
+            '料金備考': store.get('budget', {}).get('budget_memo', 'N/A'),
+            'お店キャッチ': store.get('catch', 'N/A'),
+            '総席数': store.get('capacity', 'N/A'),
+            'ジャンル名': store.get('genre', {}).get('name', 'N/A'),
+            'サブジャンル名': store.get('sub_genre', {}).get('name', 'N/A'),
+            'スマートフォン向けURL': store.get('urls', {}).get('sp', 'N/A'),
+            'PC向けURL': store.get('urls', {}).get('pc', 'N/A'),
+            '大サービスエリア名': store.get('large_service_area', {}).get('name', 'N/A')
+        } for store in stores])
+
+        # 全て取得する場合
+        if not count:
+            if len(results) >= datum['results']['results_available']:
+                break
+            params['start'] += 100  # 次の100件を取得するために開始位置を更新
+        else:
+            break
+
+    return results
+
+# データをExcelに保存する関数
+def save_to_excel(results, filename='store_data.xlsx'):
+    try:
+        if results:
+            df = pd.DataFrame(results)
+            output_directory = os.path.join(os.path.expanduser('~'), 'Documents')
+            output_file_path = os.path.join(output_directory, filename)
+            df.to_excel(output_file_path, index=False, engine='openpyxl')
+            print(f"Excelファイル '{output_file_path}' に保存されました！")
+        else:
+            print("保存するデータがありません。")
+    except Exception as e:
+        print(f"エラーが発生しました: {e}")
+
+# メイン処理
+if __name__ == "__main__":
+    # 検索キーワードをターミナルから入力
+    keywords = input("検索キーワードをスペースで区切って入力してください（例: 'カフェ 江別市 パン屋さん'）: ").split()
+    
+    # データ取得方法を選択
+    print("データ取得方法を選んでください:")
+    print("1: すべて抽出する")
+    print("2: 指定件数を抽出する")
+    choice = input("選択 (1 または 2): ")
+
+    if choice == '1':
+        count = None  # 全てを取得
+    elif choice == '2':
+        count = int(input("抽出する件数を入力してください: "))
+    else:
+        print("無効な選択です。プログラムを終了します。")
+        exit()
+
+    # データ取得とExcel保存
+    results = get_data(keywords, count)
+    save_to_excel(results)
