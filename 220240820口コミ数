@@ -1,0 +1,37 @@
+import requests
+from bs4 import BeautifulSoup
+
+# ホットペッパーのPC向けURL
+url = "https://www.hotpepper.jp/strJ003829809/?vos=nhppalsa000016"
+
+# ページの取得
+print("ページを取得しています...")
+response = requests.get(url)
+
+# ステータスコードの確認
+print(f"ステータスコード: {response.status_code}")
+
+if response.status_code == 200:
+    # BeautifulSoupを使用してHTMLを解析
+    soup = BeautifulSoup(response.text, 'html.parser')
+    
+    # 'li' タグの中で、クラス 'recommendReport' を持つ要素を検索
+    print("口コミ数を含む要素を検索中...")
+    li_element = soup.select_one('li.recommendReport > a')
+
+    if li_element:
+        # 'p' タグの中の 'recommendReportNum' クラスを持つ要素を検索
+        p_element = li_element.find_next('p', class_='recommendReportNum')
+        print(f"`p` タグ: {p_element}")
+
+        if p_element:
+            # 'span' タグの中の数値を取得
+            review_count = p_element.find('span').get_text()
+            print(f"口コミ数: {review_count}")
+        else:
+            print("`p` タグが見つかりませんでした。")
+    else:
+        print("`li` タグが見つかりませんでした。")
+else:
+    print("ページの取得に失敗しました。")
+#20240820口コミ数を取得するコード
