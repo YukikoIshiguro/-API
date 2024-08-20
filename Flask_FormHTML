@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <title>データ検索フォーム</title>
+</head>
+<body>
+    <h1>データ検索フォーム</h1>
+    <form method="POST">
+        <label for="keywords">検索キーワード:</label>
+        <input type="text" id="keywords" name="keywords" required>
+        <br>
+        <label for="count">件数（最大1000件、全てを取得する場合は空白のままにしてください）:</label>
+        <input type="number" id="count" name="count" min="1" max="1000">
+        <br>
+        <button type="submit">検索</button>
+    </form>
+</body>
+</html>
