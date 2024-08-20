@@ -1,0 +1,188 @@
+import tkinter as tk
+from tkinter import messagebox
+import requests
+import pandas as pd
+import os
+from bs4 import BeautifulSoup
+
+# APIキーをここに記入
+API_KEY = '634c407235d16f2b'
+URL = 'http://webservice.recruit.co.jp/hotpepper/gourmet/v1/'
+
+# データ取得関数
+def get_data(keywords, count=None):
+    keyword_str = ' '.join(keywords)
+    params = {
+        'key': API_KEY,
+        'keyword': keyword_str,
+        'format': 'json',
+        'count': count if count else 10000,
+        'start': 1
+    }
+    
+    results = []
+    print(f"検索キーワード: {keyword_str}")  # デバッグプリント
+    while True:
+        print(f"リクエストパラメータ: {params}")  # デバッグプリント
+        response = requests.get(URL, params=params)
+        datum = response.json()
+
+        print(f"HTTPステータスコード: {response.status_code}")  # デバッグプリント
+        if response.status_code != 200:
+            messagebox.showerror("エラー", f"HTTPエラー: {response.status_code}")
+            break
+        
+        if 'results' not in datum or 'shop' not in datum['results']:
+            messagebox.showerror("エラー", "検索に失敗しました。")
+            break
+
+        stores = datum['results']['shop']
+        print(f"取得したデータ件数: {len(stores)}")  # デバッグプリント
+        for store in stores:
+            print(f"店舗名: {store.get('name', 'N/A')}")
+            print(f"電話番号のURL: {store.get('urls', {}).get('pc', 'N/A')}")
+            print(f"サービスエリア名: {store.get('service_area', {}).get('name', 'N/A')}")
+            print(f"住所: {store.get('address', 'N/A')}")
+            print(f"口コミ: {store.get('catch', 'N/A')}")
+            print(f"営業時間: {store.get('open', 'N/A')}")
+            print(f"定休日: {store.get('close', 'N/A')}")
+            print(f"ディナー予算: {store.get('budget', {}).get('average', 'N/A')}")
+            print(f"お店キャッチ: {store.get('catch', 'N/A')}")
+            print(f"総席数: {store.get('capacity', 'N/A')}")
+            print(f"ジャンル名: {store.get('genre', {}).get('name', 'N/A')}")
+            print(f"サブジャンル名: {store.get('sub_genre', {}).get('name', 'N/A')}")
+            print(f"PC向けURL: {store.get('urls', {}).get('pc', 'N/A')}")
+            print("-" * 50)
+
+        results.extend([{
+            '店舗名': store.get('name', 'N/A'),
+            '電話番号のURL': store.get('urls', {}).get('pc', 'N/A').split('?')[0].rstrip('/') + "/tel" if store.get('urls', {}).get('pc', 'N/A') != 'N/A' else 'N/A',
+            'サービスエリア名': store.get('service_area', {}).get('name', 'N/A'),
+            '住所': store.get('address', 'N/A'),
+            '口コミ': store.get('catch', 'N/A'),
+            '営業時間': store.get('open', 'N/A'),
+            '定休日': store.get('close', 'N/A'),
+            'ディナー予算': store.get('budget', {}).get('average', 'N/A'),
+            'お店キャッチ': store.get('catch', 'N/A'),
+            '総席数': store.get('capacity', 'N/A'),
+            'ジャンル名': store.get('genre', {}).get('name', 'N/A'),
+            'サブジャンル名': store.get('sub_genre', {}).get('name', 'N/A'),
+            'PC向けURL': store.get('urls', {}).get('pc', 'N/A'),
+            '口コミ数': 'N/A'
+        } for store in stores])
+
+        print(f"現在の取得データ件数: {len(results)}")  # デバッグプリント
+        if not count:
+            if len(results) >= datum['results']['results_available']:
+                print("全データを取得しました。")  # デバッグプリント
+                break
+            params['start'] += 100
+            messagebox.showinfo("情報", f"データ取得中... 現在の取得件数: {len(results)}")
+        else:
+            break
+
+    print(f"最終取得データ件数: {len(results)}")  # デバッグプリント
+    return results
+
+# 口コミ数を取得する関数
+def get_review_count(url):
+    review_count_text = "口コミ数なし"
+    print(f"口コミ数取得URL: {url}")  # デバッグプリント
+    try:
+        response = requests.get(url)
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, 'html.parser')
+            li_element = soup.select_one('li.recommendReport > a')
+            if li_element:
+                p_element = li_element.find_next('p', class_='recommendReportNum')
+                if p_element:
+                    review_count_text = p_element.find('span').get_text()
+        print(f"口コミ数: {review_count_text}")  # デバッグプリント
+    except Exception as e:
+        print(f"口コミ数取得中にエラーが発生しました: {e}")
+
+    return review_count_text
+
+# 電話番号を取得する関数
+def get_phone_number(url):
+    phone_number_text = "電話番号なし"
+    print(f"電話番号取得URL: {url}")  # デバッグプリント
+    try:
+        response = requests.get(url)
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.content, 'html.parser')
+            phone_number_tag = soup.select_one('div.storeTelephoneWrap > p.telephoneNumber')
+            if phone_number_tag:
+                phone_number_text = phone_number_tag.get_text().strip()
+        print(f"電話番号: {phone_number_text}")  # デバッグプリント
+    except Exception as e:
+        print(f"電話番号取得中にエラーが発生しました: {e}")
+
+    return phone_number_text
+
+# データをExcelに保存する関数
+def save_to_excel(results, filename='store_data.xlsx'):
+    try:
+        if results:
+            df = pd.DataFrame(results)
+            print("データフレームの作成完了")  # デバッグプリント
+            df['電話番号'] = df['電話番号のURL'].apply(get_phone_number)
+            df['口コミ数'] = df['PC向けURL'].apply(get_review_count)
+            columns_order = ['店舗名', '電話番号', '住所', '口コミ', '営業時間', '定休日', 'ディナー予算', 
+                             'お店キャッチ', '総席数', 'ジャンル名', 'サブジャンル名', 'PC向けURL', '口コミ数', 
+                             'サービスエリア名']
+            df = df[columns_order]
+
+            output_directory = os.path.join(os.path.expanduser('~'), 'Documents')
+            output_file_path = os.path.join(output_directory, filename)
+            df.to_excel(output_file_path, index=False, engine='openpyxl')
+            print(f"Excelファイル '{output_file_path}' に保存されました！")  # デバッグプリント
+            messagebox.showinfo("完了", f"Excelファイル '{output_file_path}' に保存されました！")
+        else:
+            messagebox.showwarning("警告", "保存するデータがありません。")
+    except Exception as e:
+        messagebox.showerror("エラー", f"エラーが発生しました: {e}")
+
+# GUIの作成
+class DataExtractorApp:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("ホットペッパーグルメさんのデータ抽出ツール")
+
+        # キーワード入力
+        tk.Label(root, text="検索キーワード (スペースで区切って入力):").grid(row=0, column=0, padx=10, pady=10)
+        self.keywords_entry = tk.Entry(root, width=50)
+        self.keywords_entry.grid(row=0, column=1, padx=10, pady=10)
+
+        # 件数入力
+        tk.Label(root, text="取得件数 (空欄で最大値):").grid(row=1, column=0, padx=10, pady=10)
+        self.count_entry = tk.Entry(root, width=20)
+        self.count_entry.grid(row=1, column=1, padx=10, pady=10)
+
+        # 実行ボタン
+        self.run_button = tk.Button(root, text="データ抽出開始", command=self.run_extraction)
+        self.run_button.grid(row=2, column=1, padx=10, pady=10, sticky="e")
+
+    def run_extraction(self):
+        keywords = self.keywords_entry.get().split()
+        count = self.count_entry.get()
+        count = int(count) if count else None
+
+        if not keywords:
+            messagebox.showwarning("警告", "検索キーワードを入力してください。")
+            return
+
+        self.run_button.config(state=tk.DISABLED)
+        messagebox.showinfo("情報", "データ抽出を開始します。しばらくお待ちください...")
+
+        # データ抽出と保存
+        results = get_data(keywords, count)
+        save_to_excel(results)
+
+        self.run_button.config(state=tk.NORMAL)
+
+# Tkinterアプリケーションの起動
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = DataExtractorApp(root)
+    root.mainloop()
