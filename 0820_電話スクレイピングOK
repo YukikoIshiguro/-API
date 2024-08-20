@@ -1,0 +1,41 @@
+import requests
+from bs4 import BeautifulSoup
+
+class HotPepperScraper:
+    def __init__(self, url):
+        self.url = url
+        self.soup = None
+
+    def fetch_page(self):
+        # 指定されたURLからHTMLコンテンツを取得
+        response = requests.get(self.url)
+        if response.status_code == 200:
+            self.soup = BeautifulSoup(response.content, 'html.parser')
+        else:
+            print(f"ページの取得に失敗しました。ステータスコード: {response.status_code}")
+
+    def get_phone_number(self):
+        # デフォルト値として「電話番号なし」を設定
+        phone_number_text = "電話番号なし"
+
+        # storeTelephoneWrapクラスのpタグを探す
+        try:
+            # 詳細なセレクタを使用して要素を取得
+            phone_number_tag = self.soup.select_one('div.storeTelephoneWrap > p.telephoneNumber')
+            if phone_number_tag:
+                phone_number_text = phone_number_tag.get_text().strip()
+        except Exception as e:
+            print(f"エラーが発生しました: {e}")
+
+        return phone_number_text
+
+# 使用例
+url = 'https://www.hotpepper.jp/strJ001026358/tel'
+scraper = HotPepperScraper(url)
+scraper.fetch_page()
+phone_number = scraper.get_phone_number()
+
+if phone_number:
+    print(f"電話番号: {phone_number}")
+else:
+    print("電話番号を取得できませんでした。")
