@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ホットペッパーグルメのDATA抽出ツール</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f0f8ff;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+        }
+        h1 {
+            font-size: 28px;
+            text-align: center;
+            margin-top: 20px;
+            color: #ff69b4;
+        }
+        form {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #ffffff;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        label {
+            display: block;
+            margin-bottom: 10px;
+            font-size: 16px;
+            color: #ff69b4;
+        }
+        input[type="text"], input[type="number"] {
+            width: calc(100% - 22px);
+            padding: 10px;
+            margin-bottom: 20px;
+            border: 2px solid #ff69b4;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+            color: #ffffff;
+            background-color: #ff69b4;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #ff1493;
+        }
+        p.powered-by {
+            font-size: 12px;
+            text-align: center;
+            margin-top: 20px;
+            color: #888;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+            font-size: 14px;
+        }
+        th {
+            background-color: #ff69b4;
+            color: white;
+        }
+        #loading {
+            text-align: center;
+            color: #ff69b4;
+            font-size: 16px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>ホットペッパーグルメのDATA抽出ツール</h1>
+
+    <form id="searchForm">
+        <label for="keywords">キーワード:</label>
+        <input type="text" id="keywords" name="keywords" required>
+        <label for="count">件数:</label>
+        <input type="number" id="count" name="count">
+        <button type="submit">検索</button>
+    </form>
+
+    <div id="loading" style="display: none;">データを抽出中です...</div>
+
+    <div id="resultsContainer" style="display: none;">
+        <h2>検索結果</h2>
+        <table id="resultsTable">
+            <thead>
+                <tr>
+                    <th>番号</th>
+                    <th>店舗名</th>
+                    <th>電話番号</th>
+                    <th>口コミ数</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+        <button id="downloadBtn">結果をダウンロード</button>
+    </div>
+
+    <p class="powered-by">Powered by Powered by ホットペッパーグルメ WebサービスTechCommitメンバーの友季子</p>
+
+    <script>
+        document.getElementById('searchForm').addEventListener('submit', function(event) {
+            event.preventDefault();
+            var keywords = document.getElementById('keywords').value;
+            var count = document.getElementById('count').value;
+
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('resultsContainer').style.display = 'none';
+
+            fetch('/search', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ keywords: keywords, count: count })
+            })
+            .then(response => response.json())
+            .then(data => {
+                var resultsTable = document.getElementById('resultsTable').querySelector('tbody');
+                resultsTable.innerHTML = '';
+                data.results.forEach(function(result) {
+                    var row = resultsTable.insertRow();
+                    row.insertCell(0).textContent = result.番号;
+                    row.insertCell(1).textContent = result.店舗名;
+                    row.insertCell(2).textContent = result.電話番号;
+                    row.insertCell(3).textContent = result.口コミ数;
+                });
+
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('resultsContainer').style.display = 'block';
+                document.getElementById('downloadBtn').onclick = function() {
+                    downloadResults(data.results);
+                };
+
+                alert(data.count + '件のデータ取得が完了しました！');
+            })
+            .catch(error => console.error('Error:', error));
+        });
+
+        function downloadResults(results) {
+            fetch('/download', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body: 'results=' + JSON.stringify(results)
+            })
+            .then(response => response.text())
+            .then(message => {
+                alert(message);
+            })
+            .catch(error => console.error('Error:', error));
+        }
+    </script>
+</body>
+</html>
