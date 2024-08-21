@@ -1,0 +1,137 @@
+from flask import Flask, render_template, request
+import requests
+import pandas as pd
+import os
+from bs4 import BeautifulSoup
+
+app = Flask(__name__)
+
+# APIキーをここに記入
+API_KEY = '634c407235d16f2b'
+
+# リクエストURL
+URL = 'http://webservice.recruit.co.jp/hotpepper/gourmet/v1/'
+
+# 検索条件を設定する関数
+def get_data(keywords, count=None):
+    keyword_str = ' '.join(keywords)
+    params = {
+        'key': API_KEY,
+        'keyword': keyword_str,
+        'format': 'json',
+        'count': count if count else 100,
+        'start': 1
+    }
+    
+    results = []
+    while True:
+        response = requests.get(URL, params=params)
+        datum = response.json()
+
+        if response.status_code != 200:
+            break
+        
+        if 'results' not in datum or 'shop' not in datum['results']:
+            break
+        
+        stores = datum['results']['shop']
+        results.extend([{
+            '店舗名': store.get('name', 'N/A'),
+            '電話番号のURL': store.get('urls', {}).get('pc', 'N/A').split('?')[0].rstrip('/') + "/tel" if store.get('urls', {}).get('pc', 'N/A') != 'N/A' else 'N/A',
+            'サービスエリア名': store.get('service_area', {}).get('name', 'N/A'),
+            '住所': store.get('address', 'N/A'),
+            '口コミ': store.get('catch', 'N/A'),
+            '営業時間': store.get('open', 'N/A'),
+            '定休日': store.get('close', 'N/A'),
+            'ディナー予算': store.get('budget', {}).get('average', 'N/A'),
+            'お店キャッチ': store.get('catch', 'N/A'),
+            '総席数': store.get('capacity', 'N/A'),
+            'ジャンル名': store.get('genre', {}).get('name', 'N/A'),
+            'サブジャンル名': store.get('sub_genre', {}).get('name', 'N/A'),
+            'PC向けURL': store.get('urls', {}).get('pc', 'N/A'),
+            '口コミ数': 'N/A'
+        } for store in stores])
+
+        if not count:
+            if len(results) >= datum['results']['results_available']:
+                break
+            params['start'] += 100
+        else:
+            break
+
+    return results
+
+# 口コミ数を取得する関数
+def get_review_count(url):
+    review_count_text = "口コミ数なし"
+    try:
+        response = requests.get(url)
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, 'html.parser')
+            li_element = soup.select_one('li.recommendReport > a')
+            if li_element:
+                p_element = li_element.find_next('p', class_='recommendReportNum')
+                if p_element:
+                    review_count_text = p_element.find('span').get_text()
+    except Exception as e:
+        print(f"口コミ数取得中にエラーが発生しました: {e}")
+
+    return review_count_text
+
+# 電話番号を取得する関数
+def get_phone_number(url):
+    phone_number_text = "電話番号なし"
+    try:
+        response = requests.get(url)
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.content, 'html.parser')
+            phone_number_tag = soup.select_one('div.storeTelephoneWrap > p.telephoneNumber')
+            if phone_number_tag:
+                phone_number_text = phone_number_tag.get_text().strip()
+    except Exception as e:
+        print(f"電話番号取得中にエラーが発生しました: {e}")
+
+    return phone_number_text
+
+@app.route('/', methods=['GET', 'POST'])
+def index():
+    results = []
+    if request.method == 'POST':
+        keywords = request.form.get('keywords').split()
+        count = request.form.get('count')
+        count = int(count) if count else None
+        
+        # データ取得
+        results = get_data(keywords, count)
+        
+        # 電話番号と口コミ数を取得して追加
+        for result in results:
+            result['電話番号'] = get_phone_number(result['電話番号のURL'])
+            result['口コミ数'] = get_review_count(result['PC向けURL'])
+
+    return render_template('index.html', results=results)
+
+@app.route('/download', methods=['POST'])
+def download_excel():
+    file_path = request.form.get('file_path')
+    
+    # 保存先のディレクトリを確認
+    directory = os.path.dirname(file_path)
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+    
+    # 取得した結果をDataFrameに変換
+    results = get_data(request.form.get('keywords').split(), request.form.get('count'))
+    for result in results:
+        result['電話番号'] = get_phone_number(result['電話番号のURL'])
+        result['口コミ数'] = get_review_count(result['PC向けURL'])
+    
+    df = pd.DataFrame(results)
+
+    # Excelファイルに保存
+    df.to_excel(file_path, index=False)
+
+    return render_template('index.html', results=results, message="Excelファイルが保存されました。")
+
+if __name__ == '__main__':
+    app.run(debug=True)
