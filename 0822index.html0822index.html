@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>店舗検索</title>
+</head>
+<body>
+    <h1>店舗検索</h1>
+    <form method="POST">
+        <label for="keywords">キーワード:</label>
+        <input type="text" id="keywords" name="keywords" required>
+        <label for="count">件数:</label>
+        <input type="number" id="count" name="count">
+        <button type="submit">検索</button>
+    </form>
+
+    {% if results %}
+        <h2>検索結果</h2>
+        <table border="1">
+            <tr>
+                <th>店舗名</th>
+                <th>電話番号</th>
+                <th>サービスエリア名</th>
+                <th>住所</th>
+                <th>口コミ数</th>
+                <th>営業時間</th>
+                <th>定休日</th>
+                <th>ディナー予算</th>
+                <th>PC向けURL</th>
+            </tr>
+            {% for result in results %}
+                <tr>
+                    <td>{{ result.店舗名 }}</td>
+                    <td>{{ result.電話番号 }}</td>
+                    <td>{{ result.サービスエリア名 }}</td>
+                    <td>{{ result.住所 }}</td>
+                    <td>{{ result.口コミ数 }}</td>
+                    <td>{{ result.営業時間 }}</td>
+                    <td>{{ result.定休日 }}</td>
+                    <td>{{ result.ディナー予算 }}</td>
+                    <td><a href="{{ result.PC向けURL }}" target="_blank">リンク</a></td>
+                </tr>
+            {% endfor %}
+        </table>
+        <form method="POST" action="/download">
+            <button type="submit">Excelに出力</button>
+        </form>
+    {% endif %}
+</body>
+</html>
