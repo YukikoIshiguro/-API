@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>HotPepper グルメ検索</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f8ff; /* 明るい背景色（アリスブルー） */
+            color: #333; /* テキストカラーを濃いグレーに */
+        }
+
+        header {
+            background-color: #ff6666; /* 明るい赤色のヘッダー */
+            color: white; /* ヘッダーのテキストカラーを白に */
+            padding: 10px;
+            text-align: center;
+        }
+
+        h1 {
+            color: #ff4500; /* タイトルを明るいオレンジ色に */
+        }
+
+        form {
+            background-color: #ffe4e1; /* フォームの背景色をライトピンクに */
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        input[type="text"] {
+            padding: 5px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            width: 80%;
+        }
+
+        button {
+            background-color: #ff4500; /* 検索ボタンの背景色をオレンジ色に */
+            color: white; /* ボタンのテキストカラーを白に */
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #ff6347; /* ボタンのホバー時にトマト色に変更 */
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 10px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #ff4500; /* テーブルヘッダーの背景色をオレンジ色に */
+            color: white; /* テーブルヘッダーのテキストカラーを白に */
+        }
+
+        td {
+            background-color: #fdf5e6; /* テーブルセルの背景色をビスケット色に */
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>HotPepper グルメ検索</h1>
+        <p>Powered by ホットペッパーグルメ Webサービス</p>
+    </header>
+
+    <form method="POST">
+        <label for="keywords">検索キーワード (スペースで区切って入力):</label>
+        <input type="text" id="keywords" name="keywords" required>
+        <br><br>
+        <label for="count">取得件数 (空白の場合はすべて取得):</label>
+        <input type="text" id="count" name="count">
+        <br><br>
+        <button type="submit">検索</button>
+    </form>
+
+    {% if results %}
+    <h2>検索結果</h2>
+    <table border="1">
+        <tr>
+            <th>店舗名</th>
+            <th>電話番号</th>
+            <th>住所</th>
+            <th>口コミ</th>
+            <th>営業時間</th>
+            <th>定休日</th>
+            <th>ディナー予算</th>
+            <th>お店キャッチ</th>
+            <th>総席数</th>
+            <th>ジャンル名</th>
+            <th>サブジャンル名</th>
+            <th>口コミ数</th>
+            <th>サービスエリア名</th>
+        </tr>
+        {% for result in results %}
+        <tr>
+            <td>{{ result.店舗名 }}</td>
+            <td>{{ result.電話番号 }}</td>
+            <td>{{ result.住所 }}</td>
+            <td>{{ result.口コミ }}</td>
+            <td>{{ result.営業時間 }}</td>
+            <td>{{ result.定休日 }}</td>
+            <td>{{ result.ディナー予算 }}</td>
+            <td>{{ result.お店キャッチ }}</td>
+            <td>{{ result.総席数 }}</td>
+            <td>{{ result.ジャンル名 }}</td>
+            <td>{{ result.サブジャンル名 }}</td>
+            <td>{{ result.口コミ数 }}</td>
+            <td>{{ result.サービスエリア名 }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+    {% endif %}
+</body>
+</html>
