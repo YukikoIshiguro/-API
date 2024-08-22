@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>HotPepper グルメ検索</title>
+    <style>
+        body {
+            background-color: #FFF4E6; /* ページ全体の背景色をクリーム色に */
+            color: #333; /* テキストの基本色を暗めのグレーに */
+            font-family: Arial, sans-serif; /* フォントを設定 */
+        }
+        header {
+            background-color: #FF5656; /* ヘッダーの背景色をホットペッパーの赤に */
+            color: white; /* ヘッダーのテキスト色を白に */
+            text-align: center;
+            padding: 20px 0; /* ヘッダーのパディングを調整 */
+        }
+        h1 {
+            margin: 0;
+            font-size: 24px; /* タイトルのフォントサイズを設定 */
+        }
+        form {
+            margin: 20px;
+            padding: 20px;
+            background-color: #FFF3E0; /* フォーム部分の背景色をクリーム色に */
+            border-radius: 5px; /* フォームの角を丸くする */
+            border: 1px solid #FFAD33; /* フォームの枠をホットペッパーの黄色に */
+        }
+        label {
+            font-weight: bold; /* ラベルのテキストを太字に */
+        }
+        button {
+            background-color: #FFAD33; /* ボタンの背景色をホットペッパーの黄色に */
+            color: white; /* ボタンのテキスト色を白に */
+            border: none;
+            padding: 10px 20px; /* ボタンのパディングを調整 */
+            border-radius: 5px; /* ボタンの角を丸くする */
+            cursor: pointer; /* ボタンにカーソルを設定 */
+        }
+        button:hover {
+            background-color: #FF5656; /* ホバー時のボタンの背景色を赤に変更 */
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0; /* テーブルの上下のマージンを設定 */
+        }
+        table, th, td {
+            border: 1px solid #FFAD33; /* テーブルの枠線を黄色に */
+        }
+        th {
+            background-color: #FF5656; /* ヘッダーの背景色を赤に */
+            color: white; /* ヘッダーのテキスト色を白に */
+        }
+        td {
+            padding: 10px; /* テーブルセルのパディングを設定 */
+            text-align: center; /* テキストの中央揃え */
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>HotPepper グルメ検索</h1>
+        <p>Powered by ホットペッパーグルメ Webサービス</p>
+    </header>
+
+    <form method="POST">
+        <label for="keywords">検索キーワード (スペースで区切って入力):</label>
+        <input type="text" id="keywords" name="keywords" required>
+        <br><br>
+        <label for="count">取得件数 (空白の場合はすべて取得):</label>
+        <input type="text" id="count" name="count">
+        <br><br>
+        <button type="submit">検索</button>
+    </form>
+
+    {% if results %}
+    <h2>検索結果</h2>
+    <table border="1">
+        <tr>
+            <th>店舗名</th>
+            <th>電話番号</th>
+            <th>住所</th>
+            <th>口コミ</th>
+            <th>営業時間</th>
+            <th>定休日</th>
+            <th>ディナー予算</th>
+            <th>お店キャッチ</th>
+            <th>総席数</th>
+            <th>ジャンル名</th>
+            <th>サブジャンル名</th>
+            <th>口コミ数</th>
+            <th>サービスエリア名</th>
+            <th>PC向けURL</th> <!-- 追加 -->
+        </tr>
+        {% for result in results %}
+        <tr>
+            <td>{{ result.店舗名 }}</td>
+            <td>{{ result.電話番号 }}</td>
+            <td>{{ result.住所 }}</td>
+            <td>{{ result.口コミ }}</td>
+            <td>{{ result.営業時間 }}</td>
+            <td>{{ result.定休日 }}</td>
+            <td>{{ result.ディナー予算 }}</td>
+            <td>{{ result.お店キャッチ }}</td>
+            <td>{{ result.総席数 }}</td>
+            <td>{{ result.ジャンル名 }}</td>
+            <td>{{ result.サブジャンル名 }}</td>
+            <td>{{ result.口コミ数 }}</td>
+            <td>{{ result.サービスエリア名 }}</td>
+            <td><a href="{{ result.PC向けURL }}" target="_blank">{{ result.PC向けURL }}</a></td> <!-- 追加 -->
+        </tr>
+        {% endfor %}
+    </table>
+    {% endif %}
+</body>
+</html>
