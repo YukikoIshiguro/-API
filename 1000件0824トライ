@@ -1,0 +1,41 @@
+from flask import Flask, render_template, request, redirect, url_for
+import requests
+
+app = Flask(__name__)
+
+# ホットペッパーAPIキーを設定（あなたのAPIキーに置き換えてください）
+API_KEY = "634c407235d16f2b"
+
+@app.route('/', methods=['GET', 'POST'])
+def index():
+    if request.method == 'POST':
+        keywords = request.form.get('keywords')
+        count = request.form.get('count')
+        
+        # 検索キーワードが空でないかをチェック
+        if not keywords:
+            return render_template('index.html', results=None, error="検索キーワードを入力してください")
+
+        # ホットペッパーAPIにリクエストを送信
+        params = {
+            'key': API_KEY,
+            'keyword': keywords,
+            'count': count if count else 100,  # デフォルトでは100件取得
+            'format': 'json'
+        }
+
+        response = requests.get("https://webservice.recruit.co.jp/hotpepper/gourmet/v1/", params=params)
+        data = response.json()
+
+        # APIからのレスポンスを処理
+        if 'results' in data and 'shop' in data['results']:
+            results = data['results']['shop']
+        else:
+            results = None
+
+        return render_template('index.html', results=results)
+    
+    return render_template('index.html', results=None)
+
+if __name__ == '__main__':
+    app.run(debug=True)
