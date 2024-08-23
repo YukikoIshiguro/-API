@@ -1,0 +1,278 @@
+from flask import Flask, render_template, request, send_file, session
+import requests
+import pandas as pd
+from bs4 import BeautifulSoup
+from io import BytesIO
+
+app = Flask(__name__)
+app.secret_key = 'your_secret_key'  # セッション管理のための秘密鍵を設定
+
+# APIキーをここに記入
+API_KEY = '634c40hogehoge'
+
+# リクエストURL
+URL = 'http://webservice.recruit.co.jp/hotpepper/gourmet/v1/'
+
+def get_data(keywords, count=None):
+    keyword_str = ' '.join(keywords)  # 検索キーワードをスペースで結合
+    params = {
+        'key': API_KEY,
+        'keyword': keyword_str,
+        'format': 'json',
+        'count': count if count else 100,  # デフォルトで100件取得
+        'start': 1  # 取得開始位置
+    }
+    
+    results = []
+    while True:
+        response = requests.get(URL, params=params)  # APIリクエストを送信
+        datum = response.json()
+
+        if response.status_code != 200:  # ステータスコードが200以外の場合ループを終了
+            break
+        
+        if 'results' not in datum or 'shop' not in datum['results']:  # 結果が存在しない場合ループを終了
+            break
+        
+        stores = datum['results']['shop']
+        results.extend([{
+            '店舗名': store.get('name', 'N/A'),  # 店舗名
+            '電話番号のURL': store.get('urls', {}).get('pc', 'N/A').split('?')[0].rstrip('/') + "/tel" if store.get('urls', {}).get('pc', 'N/A') != 'N/A' else 'N/A',  # 電話番号ページのURL
+            'サービスエリア名': store.get('service_area', {}).get('name', 'N/A'),  # サービスエリア名
+            '住所': store.get('address', 'N/A'),  # 住所
+            '口コミ': store.get('catch', 'N/A'),  # 口コミ
+            '営業時間': store.get('open', 'N/A'),  # 営業時間
+            '定休日': store.get('close', 'N/A'),  # 定休日
+            'ディナー予算': store.get('budget', {}).get('average', 'N/A'),  # ディナー予算
+            'お店キャッチ': store.get('catch', 'N/A'),  # お店キャッチ
+            '総席数': store.get('capacity', 'N/A'),  # 総席数
+            'ジャンル名': store.get('genre', {}).get('name', 'N/A'),  # ジャンル名
+            'サブジャンル名': store.get('sub_genre', {}).get('name', 'N/A'),  # サブジャンル名
+            'PC向けURL': store.get('urls', {}).get('pc', 'N/A'),  # PC向けURL
+            '口コミ数': 'N/A'  # 初期値として口コミ数を'N/A'に設定
+        } for store in stores])
+
+        if not count:  # 件数指定がない場合、全件取得を試みる
+            if len(results) >= datum['results']['results_available']:
+                break
+            params['start'] += 100
+        else:
+            break
+
+    return results
+
+def get_review_count(url):
+    review_count_text = "口コミ数なし"
+    try:
+        response = requests.get(url)  # URLにリクエストを送信
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, 'html.parser')
+            li_element = soup.select_one('li.recommendReport > a')
+            if li_element:
+                p_element = li_element.find_next('p', class_='recommendReportNum')
+                if p_element:
+                    review_count_text = p_element.find('span').get_text()
+    except Exception as e:
+        print(f"口コミ数取得中にエラーが発生しました: {e}")
+
+    return review_count_text
+
+def get_phone_number(url):
+    phone_number_text = "電話番号なし"
+    try:
+        response = requests.get(url)  # 電話番号ページにリクエストを送信
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.content, 'html.parser')
+            phone_number_tag = soup.select_one('div.storeTelephoneWrap > p.telephoneNumber')
+            if phone_number_tag:
+                phone_number_text = phone_number_tag.get_text().strip()
+    except Exception as e:
+        print(f"電話番号取得中にエラーが発生しました: {e}")
+
+    return phone_number_text
+
+@app.route('/', methods=['GET', 'POST'])
+def index():
+    results = []
+    if request.method == 'POST':
+        keywords = request.form.get('keywords').split()  # キーワードをスペースで区切ってリスト化
+        count = request.form.get('count')
+        count = int(count) if count else None
+        
+        results = get_data(keywords, count)
+        
+        for result in results:
+            result['電話番号'] = get_phone_number(result['電話番号のURL'])  # 電話番号を取得
+            result['口コミ数'] = get_review_count(result['PC向けURL'])  # 口コミ数を取得
+        
+        session['results'] = results  # 結果をセッションに保存
+
+    return render_template('index.html', results=results)
+
+@app.route('/download_excel', methods=['POST'])
+def download_excel():
+    filename = request.form.get('filename')  # ファイル名をフォームから取得
+    filename = filename if filename else 'HotPepper_Results.xlsx'
+    
+    results = session.get('results', [])  # セッションから結果を取得
+    
+    df = pd.DataFrame.from_dict(results)  # データフレームに変換
+    
+    # DataFrameをBytesIOオブジェクトに書き込み
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        df.to_excel(writer, index=False, sheet_name='Results')
+    
+    output.seek(0)
+    
+    return send_file(output, as_attachment=True, download_name=f"{filename}.xlsx", mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+if __name__ == '__main__':
+    app.run(debug=True)
+ーーーーーーーーーーーーーーーーーーーーーーーーーーーーーーーーーー
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>HotPepper グルメ検索 Powered by ホットペッパーグルメ Webサービス</title>
+    <style>
+        /* 背景色をホワイト、テキストカラーをダークグレーに設定 */
+        body {
+            background-color: #ffffff; /* 白背景 */
+            color: #333333; /* ダークグレー */
+            font-family: Arial, sans-serif;
+        }
+
+        /* ヘッダーの背景色をホットペッパー風の赤に設定し、テキストを白に */
+        header {
+            background-color: #e60033; /* ホットペッパーの赤 */
+            padding: 20px;
+            text-align: center;
+            border-radius: 5px; /* 角を少し丸くする */
+            color: #ffffff; /* 白テキスト */
+        }
+
+        /* フォーム要素のスタイル */
+        form {
+            background-color: #fff5f5; /* 淡いピンク */
+            padding: 20px;
+            border: 1px solid #e60033; /* 赤いボーダー */
+            border-radius: 5px;
+            margin-bottom: 20px;
+            max-width: 600px;
+            margin: auto;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 20px;
+            border: 1px solid #e60033; /* 赤いボーダー */
+            border-radius: 5px;
+        }
+
+        /* ボタンのスタイルをホットペッパー風のオレンジに */
+        button {
+            background-color: #ff6600; /* オレンジ */
+            color: #ffffff;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #cc5200; /* 濃いオレンジ */
+        }
+
+        /* テーブルのスタイル */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            background-color: #ffffff; /* 白背景 */
+        }
+
+        th, td {
+            padding: 10px;
+            border: 1px solid #ddd;
+            text-align: left;
+        }
+
+        th {
+            background-color: #e60033; /* ホットペッパーの赤 */
+            color: #ffffff; /* 白テキスト */
+        }
+
+        tr:nth-child(even) {
+            background-color: #f9f9f9; /* 偶数行に薄いグレー */
+        }
+
+        tr:hover {
+            background-color: #ffebcd; /* ベージュ色 */
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>HotPepper グルメ検索</h1>
+        <p>Powered by ホットペッパーグルメ Webサービス</p>
+    </header>
+
+    <form method="POST">
+        <label for="keywords">検索キーワード (スペースで区切って入力):</label>
+        <input type="text" id="keywords" name="keywords" required>
+        <br><br>
+        <label for="count">取得件数 (空白の場合はすべて抽出を試みます):</label>
+        <input type="text" id="count" name="count">
+        <br><br>
+        <button type="submit">検索</button>
+    </form>
+
+    {% if results %}
+    <h2>検索結果</h2>
+    <table>
+        <tr>
+            <th>店舗名</th>
+            <th>電話番号</th>
+            <th>住所</th>
+            <th>口コミ</th>
+            <th>営業時間</th>
+            <th>定休日</th>
+            <th>ディナー予算</th>
+            <th>お店キャッチ</th>
+            <th>総席数</th>
+            <th>ジャンル名</th>
+            <th>サブジャンル名</th>
+            <th>口コミ数</th>
+            <th>サービスエリア名</th>
+            <th>PC向けURL</th>
+        </tr>
+        {% for result in results %}
+        <tr>
+            <td>{{ result.店舗名 }}</td>
+            <td>{{ result.電話番号 }}</td>
+            <td>{{ result.住所 }}</td>
+            <td>{{ result.口コミ }}</td>
+            <td>{{ result.営業時間 }}</td>
+            <td>{{ result.定休日 }}</td>
+            <td>{{ result.ディナー予算 }}</td>
+            <td>{{ result.お店キャッチ }}</td>
+            <td>{{ result.総席数 }}</td>
+            <td>{{ result.ジャンル名 }}</td>
+            <td>{{ result.サブジャンル名 }}</td>
+            <td>{{ result.口コミ数 }}</td>
+            <td>{{ result.サービスエリア名 }}</td>
+            <td><a href="{{ result.PC向けURL }}" target="_blank">{{ result.PC向けURL }}</a></td>
+        </tr>
+        {% endfor %}
+    </table>
+    {% endif %}
+</body>
+</html>
