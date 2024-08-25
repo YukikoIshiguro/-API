@@ -1,0 +1,149 @@
+from flask import Flask, render_template, request, send_file, session
+import requests
+import pandas as pd
+from bs4 import BeautifulSoup
+from io import BytesIO
+from flask_session import Session
+
+app = Flask(__name__)
+app.secret_key = 'your_secret_key'  # セッション管理のための秘密鍵を設定
+
+# サーバーサイドセッションの設定
+app.config['SESSION_TYPE'] = 'filesystem'  # サーバーサイドセッションをファイルシステムに保存
+app.config['SESSION_PERMANENT'] = False
+app.config['SESSION_USE_SIGNER'] = True
+Session(app)
+
+# APIキーをここに記入
+API_KEY = '634c407235d16f2b'
+
+# リクエストURL
+URL = 'http://webservice.recruit.co.jp/hotpepper/gourmet/v1/'
+
+def get_data(keywords, count=None):
+    keyword_str = ' '.join(keywords)  # 検索キーワードをスペースで結合
+    params = {
+        'key': API_KEY,
+        'keyword': keyword_str,
+        'format': 'json',
+        'count': 100,  # 1回のリクエストで最大100件取得
+        'start': 1  # 取得開始位置
+    }
+    
+    results = []
+    total_results = 0
+    max_results = count if count else 1000  # 指定された件数、または最大1000件を取得する
+    
+    for loop_count in range(max_results // 100 + 1):
+        response = requests.get(URL, params=params)
+        datum = response.json()
+
+        if response.status_code != 200:
+            break
+        
+        if 'results' not in datum or 'shop' not in datum['results']:
+            break
+        
+        stores = datum['results']['shop']
+        results.extend([{
+            '店舗名': store.get('name', 'N/A'),
+            '電話番号のURL': store.get('urls', {}).get('pc', 'N/A').split('?')[0].rstrip('/') + "/tel" if store.get('urls', {}).get('pc', 'N/A') != 'N/A' else 'N/A',
+            'サービスエリア名': store.get('service_area', {}).get('name', 'N/A'),
+            '住所': store.get('address', 'N/A'),
+            '口コミ': store.get('catch', 'N/A'),
+            '営業時間': store.get('open', 'N/A'),
+            '定休日': store.get('close', 'N/A'),
+            'ディナー予算': store.get('budget', {}).get('average', 'N/A'),
+            '総席数': store.get('capacity', 'N/A'),
+            'ジャンル名': store.get('genre', {}).get('name', 'N/A'),
+            'サブジャンル名': store.get('sub_genre', {}).get('name', 'N/A'),
+            'PC向けURL': store.get('urls', {}).get('pc', 'N/A'),
+            '口コミ数': 'N/A'
+        } for store in stores])
+
+        total_results += len(stores)
+
+        if total_results >= max_results:
+            break
+
+        if len(stores) < 100:
+            break
+        
+        params['start'] += 100
+    
+    return results[:max_results]  # 指定された件数、または最大1000件を返す
+
+def get_review_count(url):
+    review_count_text = "口コミ数なし"
+    try:
+        response = requests.get(url)  # URLにリクエストを送信
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, 'html.parser')
+            li_element = soup.select_one('li.recommendReport > a')
+            if li_element:
+                p_element = li_element.find_next('p', class_='recommendReportNum')
+                if p_element:
+                    review_count_text = p_element.find('span').get_text()
+    except Exception as e:
+        print(f"口コミ数取得中にエラーが発生しました: {e}")
+
+    return review_count_text
+
+def get_phone_number(url):
+    phone_number_text = "電話番号なし"
+    try:
+        response = requests.get(url)  # 電話番号ページにリクエストを送信
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.content, 'html.parser')
+            phone_number_tag = soup.select_one('div.storeTelephoneWrap > p.telephoneNumber')
+            if phone_number_tag:
+                phone_number_text = phone_number_tag.get_text().strip()
+    except Exception as e:
+        print(f"電話番号取得中にエラーが発生しました: {e}")
+
+    return phone_number_text
+
+@app.route('/', methods=['GET', 'POST'])
+def index():
+    results = []
+    if request.method == 'POST':
+        keywords = request.form.get('keywords').split()  # キーワードをスペースで区切ってリスト化
+        count = request.form.get('count')
+        count = int(count) if count else None
+        
+        results = get_data(keywords, count)
+        
+        for result in results:
+            result['電話番号'] = get_phone_number(result['電話番号のURL'])  # 電話番号を取得
+            result['口コミ数'] = get_review_count(result['PC向けURL'])  # 口コミ数を取得
+        
+        session['results'] = results  # 結果をセッションに保存
+
+    return render_template('index.html', results=results)
+
+@app.route('/download_excel', methods=['POST'])
+def download_excel():
+    filename = request.form.get('filename')  # ファイル名をフォームから取得
+    filename = filename if filename else 'HotPepper_Results'
+    
+    results = session.get('results', [])  # セッションから結果を取得
+
+    # データフレームに変換してカラムの順序を指定
+    df = pd.DataFrame.from_dict(results)
+    df = df[['店舗名', '電話番号', 'サービスエリア名', '住所', '口コミ', '営業時間', '定休日', 'ディナー予算', '総席数', 'ジャンル名', 'サブジャンル名', 'PC向けURL', '口コミ数']]
+    
+    # DataFrameをBytesIOオブジェクトに書き込み
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        df.to_excel(writer, index=False, sheet_name='Results')  # Excelファイルに書き込み
+    
+    output.seek(0)
+    
+    return send_file(output, as_attachment=True, download_name=f"{filename}.xlsx", mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+if __name__ == '__main__':
+    app.run(debug=True)
+#2024_08_25_13:14_
+#サーバーサイドセッションストレージの使用
+#セッションデータをサーバー側に保存し、クッキーにはセッションIDだけを保存する方法です。これにより、クッキーのサイズを大幅に削減できます。Flaskには、以下のようなサーバーサイドセッションストレージの拡張機能があります：
+#Flask-Sessi
