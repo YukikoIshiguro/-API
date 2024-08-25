@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hot Pepper 検索</title>
+</head>
+<body>
+    <h1>Hot Pepper 検索</h1>
+    <form method="POST" action="/">
+        <label for="keywords">キーワード:</label>
+        <input type="text" id="keywords" name="keywords" required>
+        <label for="count">件数 (オプション):</label>
+        <input type="number" id="count" name="count">
+        <button type="submit">検索</button>
+    </form>
+
+    {% if results %}
+    <h2>検索結果</h2>
+    <table border="1">
+        <thead>
+            <tr>
+                <th>店舗名</th>
+                <th>電話番号</th>
+                <th>サービスエリア名</th>
+                <th>住所</th>
+                <th>口コミ</th>
+                <th>営業時間</th>
+                <th>定休日</th>
+                <th>ディナー予算</th>
+                <th>総席数</th>
+                <th>ジャンル名</th>
+                <th>サブジャンル名</th>
+                <th>PC向けURL</th>
+                <th>口コミ数</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for result in results %}
+            <tr>
+                <td>{{ result['店舗名'] }}</td>
+                <td>{{ result['電話番号'] }}</td>
+                <td>{{ result['サービスエリア名'] }}</td>
+                <td>{{ result['住所'] }}</td>
+                <td>{{ result['口コミ'] }}</td>
+                <td>{{ result['営業時間'] }}</td>
+                <td>{{ result['定休日'] }}</td>
+                <td>{{ result['ディナー予算'] }}</td>
+                <td>{{ result['総席数'] }}</td>
+                <td>{{ result['ジャンル名'] }}</td>
+                <td>{{ result['サブジャンル名'] }}</td>
+                <td><a href="{{ result['PC向けURL'] }}">URL</a></td>
+                <td>{{ result['口コミ数'] }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h3>検索結果をExcelに保存</h3>
+    <form method="POST" action="/download_excel">
+        <label for="filename">ファイル名 (オプション):</label>
+        <input type="text" id="filename" name="filename">
+        <button type="submit">Excelをダウンロード</button>
+    </form>
+    {% endif %}
+</body>
+</html>
